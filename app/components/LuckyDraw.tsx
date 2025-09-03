@@ -21,6 +21,8 @@ export default function LuckyDraw() {
   const [displayName, setDisplayName] = useState<string>('');
   const [showWinner, setShowWinner] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [slotNames, setSlotNames] = useState<string[]>([]);
+  const [slotOffset, setSlotOffset] = useState(0);
   
   const audioRef = useRef<AudioManager | null>(null);
   const spinIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -99,6 +101,25 @@ export default function LuckyDraw() {
     initAudio();
   }, [isMuted]);
 
+  // Create slot machine data when names change
+  useEffect(() => {
+    if (names.length > 0) {
+      // Create a repeating array for slot machine effect
+      const repeatedNames = [];
+      const repeats = Math.max(10, Math.ceil(50 / names.length)); // Ensure enough names for smooth scrolling
+      
+      for (let i = 0; i < repeats; i++) {
+        repeatedNames.push(...names);
+      }
+      
+      setSlotNames(repeatedNames);
+      setSlotOffset(0);
+    } else {
+      setSlotNames([]);
+      setSlotOffset(0);
+    }
+  }, [names]);
+
   const clearWinnerState = () => {
     setWinner(null);
     setShowWinner(false);
@@ -135,54 +156,83 @@ export default function LuckyDraw() {
   };
 
   const startDraw = () => {
-    if (names.length === 0) return;
+    if (names.length === 0 || slotNames.length === 0) return;
     
     audioRef.current?.playClickSound();
     setIsSpinning(true);
     setWinner(null);
     setShowWinner(false);
     
-    let spinCount = 0;
-    const maxSpins = 30;
-    const spinDuration = 2500; // 2.5 seconds
+    let currentOffset = 0;
+    let speed = 12; // Initial speed (pixels per frame)
+    const minSpeed = 0.8;
+    const deceleration = 0.985; // Deceleration factor
+    const spinDuration = 3500; // 3.5 seconds
+    const itemHeight = 80; // Height of each slot item
     
-    spinIntervalRef.current = setInterval(() => {
-      const randomIndex = Math.floor(Math.random() * names.length);
-      setDisplayName(names[randomIndex]);
-      audioRef.current?.playSpinSound();
+    let soundCounter = 0;
+    const animate = () => {
+      currentOffset += speed;
       
-      spinCount++;
-      
-      // Gradually slow down the spinning
-      if (spinCount > maxSpins * 0.7) {
-        if (spinIntervalRef.current) {
-          clearInterval(spinIntervalRef.current);
-          spinIntervalRef.current = setInterval(() => {
-            const randomIndex = Math.floor(Math.random() * names.length);
-            setDisplayName(names[randomIndex]);
-            spinCount++;
-          }, 150); // Slower interval
-        }
+      // Wrap around when we've scrolled past the repeated names
+      if (currentOffset >= slotNames.length * itemHeight / 3) {
+        currentOffset = 0;
       }
-    }, 80);
-
+      
+      setSlotOffset(currentOffset);
+      
+      // Play sound less frequently to avoid overwhelming
+      soundCounter++;
+      if (soundCounter % 8 === 0) {
+        audioRef.current?.playSpinSound();
+      }
+      
+      // Gradually slow down
+      if (speed > minSpeed) {
+        speed *= deceleration;
+      }
+    };
+    
+    // Start animation loop
+    spinIntervalRef.current = setInterval(animate, 16); // ~60fps
+    
     // Stop spinning and show winner
     setTimeout(() => {
       if (spinIntervalRef.current) {
         clearInterval(spinIntervalRef.current);
       }
       
+      // Calculate final position to land on a name
       const finalWinner = names[Math.floor(Math.random() * names.length)];
-      setWinner(finalWinner);
-      setDisplayName(finalWinner);
-      setIsSpinning(false);
+      const winnerIndex = slotNames.findIndex(name => name === finalWinner);
+      const finalOffset = winnerIndex * itemHeight;
       
-      setTimeout(() => {
-        setShowWinner(true);
-        audioRef.current?.playWinnerSound();
-        triggerConfetti();
-      }, 300);
+      // Smooth final positioning
+      let currentFinalOffset = currentOffset;
+      const targetOffset = finalOffset;
+      const smoothingSpeed = 0.15;
       
+      const smoothFinish = () => {
+        const diff = targetOffset - currentFinalOffset;
+        if (Math.abs(diff) > 1) {
+          currentFinalOffset += diff * smoothingSpeed;
+          setSlotOffset(currentFinalOffset);
+          requestAnimationFrame(smoothFinish);
+        } else {
+          setSlotOffset(targetOffset);
+          setWinner(finalWinner);
+          setDisplayName(finalWinner);
+          setIsSpinning(false);
+          
+          setTimeout(() => {
+            setShowWinner(true);
+            audioRef.current?.playWinnerSound();
+            triggerConfetti();
+          }, 300);
+        }
+      };
+      
+      smoothFinish();
     }, spinDuration);
   };
 
@@ -210,68 +260,174 @@ export default function LuckyDraw() {
             animate={{ opacity: 1, y: 0 }}
             className="card-elevated rounded-2xl lg:rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center space-y-6 sm:space-y-8 w-full max-w-2xl"
           >
-            {/* Result Display */}
-            <div className="w-full h-48 sm:h-64 flex items-center justify-center">
-              <AnimatePresence mode="wait">
-                {!winner && !isSpinning && (
-                  <motion.div
-                    key="waiting"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="text-center"
-                  >
-                    <div className="text-4xl sm:text-6xl mb-2 sm:mb-4">🎲</div>
-                    <p className="text-base sm:text-lg" style={{color: 'var(--secondary)'}}>Ready to draw?</p>
-                  </motion.div>
-                )}
+            {/* Slot Machine Display */}
+            <div className="w-full h-80 sm:h-96 flex items-center justify-center">
+              <div className="relative w-full max-w-md">
+                {/* Slot Machine Frame */}
+                <div 
+                  className="relative bg-gradient-to-br from-yellow-400 to-yellow-600 p-6 rounded-3xl shadow-2xl"
+                  style={{
+                    background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                  }}
+                >
+                  {/* Decorative dots around the frame */}
+                  <div className="absolute inset-4 rounded-2xl border-4 border-white/20">
+                    {/* Top dots */}
+                    {[...Array(12)].map((_, i) => (
+                      <div
+                        key={`top-${i}`}
+                        className="absolute w-3 h-3 bg-white rounded-full"
+                        style={{
+                          top: '-6px',
+                          left: `${8 + (i * (100 - 16) / 11)}%`,
+                          transform: 'translateX(-50%)',
+                          boxShadow: '0 0 10px rgba(255, 255, 255, 0.8)'
+                        }}
+                      />
+                    ))}
+                    {/* Bottom dots */}
+                    {[...Array(12)].map((_, i) => (
+                      <div
+                        key={`bottom-${i}`}
+                        className="absolute w-3 h-3 bg-white rounded-full"
+                        style={{
+                          bottom: '-6px',
+                          left: `${8 + (i * (100 - 16) / 11)}%`,
+                          transform: 'translateX(-50%)',
+                          boxShadow: '0 0 10px rgba(255, 255, 255, 0.8)'
+                        }}
+                      />
+                    ))}
+                    {/* Left dots */}
+                    {[...Array(8)].map((_, i) => (
+                      <div
+                        key={`left-${i}`}
+                        className="absolute w-3 h-3 bg-white rounded-full"
+                        style={{
+                          left: '-6px',
+                          top: `${12 + (i * (100 - 24) / 7)}%`,
+                          transform: 'translateY(-50%)',
+                          boxShadow: '0 0 10px rgba(255, 255, 255, 0.8)'
+                        }}
+                      />
+                    ))}
+                    {/* Right dots */}
+                    {[...Array(8)].map((_, i) => (
+                      <div
+                        key={`right-${i}`}
+                        className="absolute w-3 h-3 bg-white rounded-full"
+                        style={{
+                          right: '-6px',
+                          top: `${12 + (i * (100 - 24) / 7)}%`,
+                          transform: 'translateY(-50%)',
+                          boxShadow: '0 0 10px rgba(255, 255, 255, 0.8)'
+                        }}
+                      />
+                    ))}
+                  </div>
 
-                {isSpinning && (
-                  <motion.div
-                    key="spinning"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="text-center"
+                  {/* Slot Machine Window */}
+                  <div 
+                    className="relative bg-white rounded-2xl p-4 overflow-hidden"
+                    style={{
+                      height: '240px',
+                      boxShadow: 'inset 0 4px 12px rgba(0, 0, 0, 0.3)'
+                    }}
                   >
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="text-4xl sm:text-6xl mb-2 sm:mb-4"
-                    >
-                      🎯
-                    </motion.div>
-                    <div className="text-xl sm:text-3xl font-bold spinning-text mb-2" style={{color: 'var(--foreground)'}}>
-                      {displayName}
-                    </div>
-                    <p className="text-base sm:text-lg" style={{color: 'var(--primary)'}}>Spinning...</p>
-                  </motion.div>
-                )}
-
-                {showWinner && winner && (
-                  <motion.div
-                    key="winner"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="text-center"
-                  >
-                    <motion.div
-                      animate={{ 
-                        scale: [1, 1.2, 1],
-                        rotate: [0, 5, -5, 0]
+                    {/* Selection Indicator */}
+                    <div 
+                      className="absolute left-0 right-0 bg-red-500/20 border-2 border-red-500 rounded-lg z-10"
+                      style={{
+                        top: '50%',
+                        height: '80px',
+                        transform: 'translateY(-50%)',
+                        boxShadow: '0 0 20px rgba(239, 68, 68, 0.4)'
                       }}
-                      transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 2 }}
-                      className="text-4xl sm:text-6xl mb-2 sm:mb-4"
-                    >
-                      🏆
-                    </motion.div>
-                    <div className="text-2xl sm:text-4xl font-bold mb-2 px-2 text-center break-words" style={{color: '#fbbf24'}}>
-                      {winner}
+                    />
+
+                    {/* Names Display */}
+                    <div className="relative h-full">
+                      <AnimatePresence mode="wait">
+                        {!isSpinning && slotNames.length === 0 && (
+                          <motion.div
+                            key="empty"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex items-center justify-center h-full text-center"
+                          >
+                            <div>
+                              <div className="text-4xl mb-4">🎰</div>
+                              <p className="text-gray-500 font-medium">Add participants to start!</p>
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {slotNames.length > 0 && (
+                          <motion.div
+                            key="slot-machine"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0"
+                          >
+                            <div 
+                              className="absolute w-full"
+                              style={{
+                                transform: `translateY(-${slotOffset}px)`,
+                                transition: isSpinning ? 'none' : 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                              }}
+                            >
+                              {slotNames.map((name, index) => (
+                                <div
+                                  key={`${name}-${index}`}
+                                  className="flex items-center justify-center font-bold text-gray-800"
+                                  style={{
+                                    height: '80px',
+                                    fontSize: slotNames.length <= 5 ? '24px' : '20px'
+                                  }}
+                                >
+                                  {name}
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                    <p className="text-lg sm:text-xl font-semibold" style={{color: '#10b981'}}>Winner!</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  </div>
+                </div>
+
+                {/* Winner Celebration Overlay */}
+                <AnimatePresence>
+                  {showWinner && winner && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.5 }}
+                      className="absolute inset-0 flex items-center justify-center z-20"
+                    >
+                      <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 text-center shadow-2xl border-4 border-yellow-400">
+                        <motion.div
+                          animate={{ 
+                            scale: [1, 1.2, 1],
+                            rotate: [0, 5, -5, 0]
+                          }}
+                          transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 2 }}
+                          className="text-6xl mb-4"
+                        >
+                          🏆
+                        </motion.div>
+                        <div className="text-3xl font-bold mb-2 text-yellow-600">
+                          {winner}
+                        </div>
+                        <p className="text-xl font-semibold text-green-600">Winner!</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
             {/* Draw Button */}
@@ -284,13 +440,16 @@ export default function LuckyDraw() {
                 w-full py-4 sm:py-6 px-6 sm:px-8 rounded-2xl sm:rounded-3xl font-bold text-lg sm:text-2xl transition-all duration-300
                 ${names.length === 0 || isSpinning 
                   ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
-                  : 'btn-primary'
+                  : 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-white shadow-lg hover:from-yellow-500 hover:to-yellow-700'
                 }
                 flex items-center justify-center gap-2 sm:gap-3
               `}
+              style={names.length > 0 && !isSpinning ? {
+                boxShadow: '0 10px 25px rgba(251, 191, 36, 0.4)'
+              } : {}}
             >
               <Play size={20} className="sm:w-7 sm:h-7" />
-              {isSpinning ? 'Drawing...' : 'Start Draw'}
+              {isSpinning ? 'Spinning...' : '🎰 Pull the Lever!'}
             </motion.button>
 
             {names.length === 0 && (
