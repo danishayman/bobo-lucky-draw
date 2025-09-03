@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Volume2, VolumeX, Trash2, Users, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Volume2, VolumeX, Trash2, Users, ChevronRight, ChevronLeft } from 'lucide-react';
 
 interface AudioManager {
   playClickSound: () => void;
@@ -29,27 +29,26 @@ export default function ParticipantsPanel({
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(true);
 
-  const addName = () => {
+  // Automatically parse names from input value
+  useEffect(() => {
     if (inputValue.trim()) {
-      audioRef.current?.playClickSound();
-      const newNames = inputValue
+      const parsedNames = inputValue
         .split(/[,\n]/)
         .map(name => name.trim())
         .filter(name => name.length > 0);
       
-      setNames(prev => [...prev, ...newNames]);
-      setInputValue('');
+      setNames(parsedNames);
+    } else {
+      setNames([]);
     }
-  };
+  }, [inputValue, setNames]);
 
-  const removeName = (index: number) => {
-    audioRef.current?.playClickSound();
-    setNames(prev => prev.filter((_, i) => i !== index));
-  };
+
 
   const clearAllNames = () => {
     audioRef.current?.playClickSound();
     setNames([]);
+    setInputValue('');
     onClearAll?.();
   };
 
@@ -121,66 +120,15 @@ export default function ParticipantsPanel({
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder="Enter names (one per line or comma-separated)..."
-                    className="w-full h-24 sm:h-32 p-3 sm:p-4 rounded-xl sm:rounded-2xl resize-none text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                    className="w-full h-48 sm:h-64 p-3 sm:p-4 rounded-xl sm:rounded-2xl resize-none text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-red-500/20"
                     style={{background: 'var(--card-elevated)', border: '1px solid var(--border)', color: 'var(--foreground)'}} 
                     onFocus={(e) => e.target.style.borderColor = 'var(--primary)'} 
                     onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && e.ctrlKey) {
-                        e.preventDefault();
-                        addName();
-                      }
-                    }}
                   />
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={addName}
-                    className="w-full btn-primary font-semibold py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 text-sm sm:text-base"
-                    disabled={!inputValue.trim()}
-                  >
-                    <Plus size={20} />
-                    Add Names
-                  </motion.button>
                 </div>
               </div>
 
-              {/* Names List */}
-              <div className="flex-1 overflow-hidden">
-                <div className="p-4 sm:p-6 h-full">
-                  <div className="space-y-2 h-full overflow-y-auto">
-                    <AnimatePresence>
-                      {names.map((name, index) => (
-                        <motion.div
-                          key={`${name}-${index}`}
-                          initial={{ opacity: 0, x: 20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 20 }}
-                          className="flex items-center justify-between rounded-lg sm:rounded-xl p-2.5 sm:p-3 transition-all duration-200 hover:opacity-80"
-                          style={{background: 'var(--card-elevated)', border: '1px solid var(--border)'}}
-                        >
-                          <span className="font-medium text-sm sm:text-base truncate pr-2" style={{color: 'var(--foreground)'}}>{name}</span>
-                          <button
-                            onClick={() => removeName(index)}
-                            className="p-1 rounded-full transition-all duration-200 flex-shrink-0 hover:opacity-80"
-                            style={{color: 'var(--primary)'}}
-                          >
-                            <X size={16} />
-                          </button>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                    
-                    {names.length === 0 && (
-                      <div className="text-center py-8" style={{color: 'var(--secondary)'}}>
-                        <Users size={48} className="mx-auto mb-4 opacity-50" />
-                        <p>No participants added yet</p>
-                        <p className="text-sm mt-2">Add some names to get started!</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+
 
               {/* Footer */}
               <div className="p-4 sm:p-6" style={{borderTop: '1px solid var(--border)'}}>
