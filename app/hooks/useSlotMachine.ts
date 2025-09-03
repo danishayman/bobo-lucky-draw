@@ -92,28 +92,72 @@ export function useSlotMachine({ names, audioManager }: SlotMachineHookProps) {
     const finalTargetOffset = (targetIndex * itemHeight) - centerOffset;
     
     // Calculate total distance to travel (multiple full rotations + final position)
-    const minRotations = 5; // Minimum number of full rotations
+    const minRotations = 8; // More rotations for more dramatic effect
     const fullRotationDistance = names.length * itemHeight;
     const totalDistance = (minRotations * fullRotationDistance) + finalTargetOffset;
     
     const spinDuration = 19000; // 19 seconds
     const startTime = Date.now();
     let currentDistance = 0;
-    let speed = 15; // Initial speed
-    const minSpeed = 0.8;
+    
+    // Physics-based parameters for more natural motion
+    const maxSpeed = 25; // Higher initial speed for more dramatic effect
+    const accelerationPhase = 0.15; // 15% of time accelerating
+    const constantPhase = 0.35; // 35% of time at constant speed  
+    const decelerationPhase = 0.5; // 50% of time decelerating
     
     let animationId: number;
+    
+    // Natural easing function that mimics real physics
+    const easeOutExponential = (t: number): number => {
+      return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+    };
+    
+    // Cubic bezier easing for smooth acceleration
+    const easeInOutCubic = (t: number): number => {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    };
+    
+    // Add subtle randomness to prevent mechanical feeling
+    const getSpeedVariation = (baseSpeed: number): number => {
+      const variation = 0.05; // 5% variation
+      const randomFactor = 1 + (Math.random() - 0.5) * variation;
+      return baseSpeed * randomFactor;
+    };
     
     const animate = () => {
       const elapsedTime = Date.now() - startTime;
       const progress = Math.min(elapsedTime / spinDuration, 1);
       
-      // Smooth deceleration curve based on time, not distance
-      if (progress > 0.75) {
-        // Start slowing down in the last 25% of the time
-        const decelerationProgress = (progress - 0.75) / 0.25;
-        const decelerationFactor = 1 - (decelerationProgress * 0.9); // Slow down to 10% of original speed
-        speed = Math.max(minSpeed, 15 * decelerationFactor);
+      let speed: number;
+      
+      if (progress <= accelerationPhase) {
+        // Acceleration phase - smooth start
+        const accelerationProgress = progress / accelerationPhase;
+        const easedProgress = easeInOutCubic(accelerationProgress);
+        speed = getSpeedVariation(maxSpeed * easedProgress);
+      } else if (progress <= accelerationPhase + constantPhase) {
+        // Constant speed phase with slight variations
+        speed = getSpeedVariation(maxSpeed);
+      } else {
+        // Deceleration phase - natural slowdown
+        const decelerationStart = accelerationPhase + constantPhase;
+        const decelerationProgress = (progress - decelerationStart) / decelerationPhase;
+        
+        // Use exponential decay for more natural deceleration
+        const decelerationFactor = 1 - easeOutExponential(decelerationProgress);
+        
+        // Ensure minimum speed to prevent stopping too early
+        const minSpeed = 0.5;
+        speed = Math.max(minSpeed, maxSpeed * decelerationFactor);
+        
+        // Add micro-stutters near the end for realism (like real slot machines)
+        if (decelerationProgress > 0.8) {
+          const stutterIntensity = (decelerationProgress - 0.8) / 0.2;
+          const stutterFrequency = 0.3;
+          const stutter = Math.sin(elapsedTime * stutterFrequency) * stutterIntensity * 0.3;
+          speed *= (1 + stutter);
+        }
       }
       
       currentDistance += speed;
@@ -141,36 +185,21 @@ export function useSlotMachine({ names, audioManager }: SlotMachineHookProps) {
       const centerPosition = currentOffset + centerOffset;
       const currentIndex = Math.round(centerPosition / itemHeight) % slotNames.length;
       
-      // Calculate the exact position to center this name
+      // Calculate the exact position to center this name with NO offset
       const targetFinalOffset = (Math.round(centerPosition / itemHeight) * itemHeight) - centerOffset;
       
-      // Smooth final positioning to exact center
-      let currentFinalOffset = currentOffset;
+      // Immediately snap to perfect alignment - no gradual movement
+      setSlotOffset(targetFinalOffset);
       
-      const smoothFinish = () => {
-        const diff = targetFinalOffset - currentFinalOffset;
-        if (Math.abs(diff) > 0.5) {
-          currentFinalOffset += diff * 0.2;
-          setSlotOffset(currentFinalOffset);
-          requestAnimationFrame(smoothFinish);
-        } else {
-          // Ensure perfect alignment
-          setSlotOffset(targetFinalOffset);
-          
-          // Set winner based on final position
-          const actualWinner = slotNames[currentIndex];
-          
-          setWinner(actualWinner);
-          
-          setTimeout(() => {
-            setShowWinner(true);
-            audioManager?.playWinnerSound();
-            triggerConfetti();
-          }, 300);
-        }
-      };
+      // Set winner based on final position
+      const actualWinner = slotNames[currentIndex];
+      setWinner(actualWinner);
       
-      smoothFinish();
+      setTimeout(() => {
+        setShowWinner(true);
+        audioManager?.playWinnerSound();
+        triggerConfetti();
+      }, 300);
     };
     
     // Start spinning sound

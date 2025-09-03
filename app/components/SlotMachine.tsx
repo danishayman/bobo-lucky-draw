@@ -23,10 +23,14 @@ export default function SlotMachine({
       <div className="relative w-full max-w-md">
         {/* Slot Machine Frame */}
         <div 
-          className="relative bg-gradient-to-br from-yellow-400 to-yellow-600 p-6 rounded-3xl shadow-2xl"
+          className={`relative bg-gradient-to-br from-yellow-400 to-yellow-600 p-6 rounded-3xl shadow-2xl transition-all duration-300 ${
+            isSpinning ? 'scale-[1.02] shadow-3xl' : 'scale-100'
+          }`}
           style={{
             background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+            boxShadow: isSpinning 
+              ? '0 30px 60px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 30px rgba(251, 191, 36, 0.3)' 
+              : '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
           }}
         >
           {/* Decorative dots around the frame */}
@@ -95,12 +99,16 @@ export default function SlotMachine({
           >
             {/* Selection Indicator */}
             <div 
-              className="absolute left-0 right-0 bg-red-500/20 border-2 border-red-500 rounded-lg z-10"
+              className={`absolute left-0 right-0 bg-red-500/20 border-2 border-red-500 rounded-lg z-10 transition-all duration-200 ${
+                isSpinning ? 'animate-pulse border-red-400' : 'border-red-500'
+              }`}
               style={{
                 top: '50%',
                 height: '80px',
                 transform: 'translateY(-50%)',
-                boxShadow: '0 0 20px rgba(239, 68, 68, 0.4)'
+                boxShadow: isSpinning 
+                  ? '0 0 25px rgba(239, 68, 68, 0.6), inset 0 0 10px rgba(239, 68, 68, 0.1)' 
+                  : '0 0 20px rgba(239, 68, 68, 0.4)'
               }}
             />
 
@@ -134,16 +142,20 @@ export default function SlotMachine({
                       className="absolute w-full"
                       style={{
                         transform: `translateY(-${slotOffset}px)`,
-                        transition: isSpinning ? 'none' : 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                        transition: isSpinning ? 'none' : 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                        filter: isSpinning ? 'blur(0.5px)' : 'none'
                       }}
                     >
                       {slotNames.map((name, index) => (
                         <div
                           key={`${name}-${index}`}
-                          className="flex items-center justify-center font-bold text-gray-800"
+                          className={`flex items-center justify-center font-bold text-gray-800 transition-all duration-200 ${
+                            isSpinning ? 'opacity-90' : 'opacity-100'
+                          }`}
                           style={{
                             height: '80px',
-                            fontSize: slotNames.length <= 5 ? '24px' : '20px'
+                            fontSize: slotNames.length <= 5 ? '24px' : '20px',
+                            textShadow: isSpinning ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'
                           }}
                         >
                           {name}
