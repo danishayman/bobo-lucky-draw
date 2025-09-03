@@ -120,7 +120,7 @@ export default function ParticipantsPanel({
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder="Enter names (one per line or comma-separated)..."
-                    className="w-full h-48 sm:h-64 p-3 sm:p-4 rounded-xl sm:rounded-2xl resize-none text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                    className="w-full h-48 sm:h-190 p-3 sm:p-4 rounded-xl sm:rounded-2xl resize-none text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-red-500/20"
                     style={{background: 'var(--card-elevated)', border: '1px solid var(--border)', color: 'var(--foreground)'}} 
                     onFocus={(e) => e.target.style.borderColor = 'var(--primary)'} 
                     onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
