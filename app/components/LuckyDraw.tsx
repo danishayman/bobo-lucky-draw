@@ -60,8 +60,9 @@ export default function LuckyDraw() {
             {/* Draw Button */}
             <DrawButton
               onClick={startDraw}
-              disabled={names.length === 0 || isSpinning}
+              disabled={names.length === 0 || isSpinning || (audioManager?.isWinnerSoundPlaying?.() ?? false)}
               isSpinning={isSpinning}
+              isWinnerSoundPlaying={audioManager?.isWinnerSoundPlaying?.() ?? false}
               namesCount={names.length}
             />
           </motion.div>

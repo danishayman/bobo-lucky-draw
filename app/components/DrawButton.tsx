@@ -7,10 +7,11 @@ interface DrawButtonProps {
   onClick: () => void;
   disabled: boolean;
   isSpinning: boolean;
+  isWinnerSoundPlaying: boolean;
   namesCount: number;
 }
 
-export default function DrawButton({ onClick, disabled, isSpinning, namesCount }: DrawButtonProps) {
+export default function DrawButton({ onClick, disabled, isSpinning, isWinnerSoundPlaying, namesCount }: DrawButtonProps) {
   return (
     <>
       <motion.button
@@ -31,7 +32,7 @@ export default function DrawButton({ onClick, disabled, isSpinning, namesCount }
         } : {}}
       >
         <Play size={20} className="sm:w-7 sm:h-7" />
-        {isSpinning ? 'Spinning...' : '🎰 Pull the Lever!'}
+        {isSpinning ? 'Spinning...' : isWinnerSoundPlaying ? '🎵 Playing Winner Sound...' : '🎰 Pull the Lever!'}
       </motion.button>
 
       {namesCount === 0 && (

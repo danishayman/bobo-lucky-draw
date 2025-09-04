@@ -80,7 +80,7 @@ export function useSlotMachine({ names, audioManager }: SlotMachineHookProps) {
     setShowWinner(false);
     
     const itemHeight = 80; // Height of each slot item
-    const centerOffset = 80; // Offset to center the selection (half of window height - half of item height)
+    const centerOffset = 120; // Offset to center the selection in the red box (240px window / 2 = 120px)
     
     // Pre-determine the winner and calculate target position
     const finalWinner = names[Math.floor(Math.random() * names.length)];
@@ -91,8 +91,8 @@ export function useSlotMachine({ names, audioManager }: SlotMachineHookProps) {
     const targetIndex = names.length + winnerIndexInMiddle;
     const finalTargetOffset = (targetIndex * itemHeight) - centerOffset;
     
-    // Calculate total distance to travel (multiple full rotations + final position)
-    const minRotations = 8; // More rotations for more dramatic effect
+    // Calculate total distance to travel (fewer rotations for slower overall speed)
+    const minRotations = 5; // Reduced from 8 to 5 for slower spinning
     const fullRotationDistance = names.length * itemHeight;
     const totalDistance = (minRotations * fullRotationDistance) + finalTargetOffset;
     
@@ -100,27 +100,35 @@ export function useSlotMachine({ names, audioManager }: SlotMachineHookProps) {
     const startTime = Date.now();
     let currentDistance = 0;
     
-    // Physics-based parameters for more natural motion
-    const maxSpeed = 25; // Higher initial speed for more dramatic effect
-    const accelerationPhase = 0.15; // 15% of time accelerating
-    const constantPhase = 0.35; // 35% of time at constant speed  
-    const decelerationPhase = 0.5; // 50% of time decelerating
+    // Adjusted physics parameters for slower, more realistic motion
+    const maxSpeed = 12; // Reduced from 25 to 12 for much slower spinning
+    const accelerationPhase = 0.1; // 10% of time accelerating (shorter)
+    const constantPhase = 0.3; // 30% of time at constant speed
+    const decelerationPhase = 0.6; // 60% of time decelerating (much longer for realistic slowdown)
     
     let animationId: number;
     
-    // Natural easing function that mimics real physics
-    const easeOutExponential = (t: number): number => {
-      return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+    // More realistic easing functions
+    const easeOutQuart = (t: number): number => {
+      return 1 - Math.pow(1 - t, 4);
     };
     
-    // Cubic bezier easing for smooth acceleration
-    const easeInOutCubic = (t: number): number => {
-      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    // Smoother acceleration with less aggressive curve
+    const easeInQuad = (t: number): number => {
+      return t * t;
     };
     
-    // Add subtle randomness to prevent mechanical feeling
+    // More realistic deceleration curve (like a real spinning wheel with friction)
+    const realWorldDeceleration = (t: number): number => {
+      // Combination of exponential and quadratic for more realistic physics
+      const exponential = 1 - Math.pow(2, -8 * t);
+      const quadratic = 1 - Math.pow(1 - t, 2);
+      return (exponential * 0.7) + (quadratic * 0.3);
+    };
+    
+    // Reduced speed variation for smoother motion
     const getSpeedVariation = (baseSpeed: number): number => {
-      const variation = 0.05; // 5% variation
+      const variation = 0.02; // Reduced from 0.05 to 0.02 for smoother motion
       const randomFactor = 1 + (Math.random() - 0.5) * variation;
       return baseSpeed * randomFactor;
     };
@@ -132,31 +140,39 @@ export function useSlotMachine({ names, audioManager }: SlotMachineHookProps) {
       let speed: number;
       
       if (progress <= accelerationPhase) {
-        // Acceleration phase - smooth start
+        // Smoother acceleration phase
         const accelerationProgress = progress / accelerationPhase;
-        const easedProgress = easeInOutCubic(accelerationProgress);
+        const easedProgress = easeInQuad(accelerationProgress);
         speed = getSpeedVariation(maxSpeed * easedProgress);
       } else if (progress <= accelerationPhase + constantPhase) {
-        // Constant speed phase with slight variations
+        // Constant speed phase with minimal variations
         speed = getSpeedVariation(maxSpeed);
       } else {
-        // Deceleration phase - natural slowdown
+        // Extended, more realistic deceleration phase
         const decelerationStart = accelerationPhase + constantPhase;
         const decelerationProgress = (progress - decelerationStart) / decelerationPhase;
         
-        // Use exponential decay for more natural deceleration
-        const decelerationFactor = 1 - easeOutExponential(decelerationProgress);
+        // Use realistic deceleration curve
+        const decelerationFactor = 1 - realWorldDeceleration(decelerationProgress);
         
-        // Ensure minimum speed to prevent stopping too early
-        const minSpeed = 0.5;
+        // More gradual minimum speed reduction
+        const minSpeed = 0.2; // Lower minimum speed for more gradual stop
         speed = Math.max(minSpeed, maxSpeed * decelerationFactor);
         
-        // Add micro-stutters near the end for realism (like real slot machines)
-        if (decelerationProgress > 0.8) {
-          const stutterIntensity = (decelerationProgress - 0.8) / 0.2;
-          const stutterFrequency = 0.3;
-          const stutter = Math.sin(elapsedTime * stutterFrequency) * stutterIntensity * 0.3;
+        // More realistic micro-stutters that start earlier and are more subtle
+        if (decelerationProgress > 0.5) {
+          const stutterIntensity = (decelerationProgress - 0.5) / 0.5;
+          const stutterFrequency = 0.15; // Slower, more realistic stutter frequency
+          const stutter = Math.sin(elapsedTime * stutterFrequency) * stutterIntensity * 0.15; // More subtle
           speed *= (1 + stutter);
+        }
+        
+        // Add final "tick-tick-tick" effect in last 15% of deceleration
+        if (decelerationProgress > 0.85) {
+          const tickProgress = (decelerationProgress - 0.85) / 0.15;
+          const tickFrequency = 0.8 + (tickProgress * 1.2); // Increasing frequency as it slows
+          const tickEffect = Math.abs(Math.sin(elapsedTime * tickFrequency)) * tickProgress * 0.3;
+          speed *= (1 - tickEffect);
         }
       }
       
@@ -171,7 +187,7 @@ export function useSlotMachine({ names, audioManager }: SlotMachineHookProps) {
       if (progress < 1) {
         animationId = requestAnimationFrame(animate);
       } else {
-        // Time's up - finish animation
+        // Time's up - finish animation with final positioning
         finishAnimation();
       }
     };
@@ -185,21 +201,41 @@ export function useSlotMachine({ names, audioManager }: SlotMachineHookProps) {
       const centerPosition = currentOffset + centerOffset;
       const currentIndex = Math.round(centerPosition / itemHeight) % slotNames.length;
       
-      // Calculate the exact position to center this name with NO offset
+      // Calculate the exact position to center this name with precise alignment
       const targetFinalOffset = (Math.round(centerPosition / itemHeight) * itemHeight) - centerOffset;
       
-      // Immediately snap to perfect alignment - no gradual movement
-      setSlotOffset(targetFinalOffset);
+      // Smooth final positioning instead of immediate snap
+      const finalPositioningDuration = 200; // 200ms for final positioning
+      const startOffset = slotOffset;
+      const endOffset = targetFinalOffset;
+      const positioningStartTime = Date.now();
       
-      // Set winner based on final position
-      const actualWinner = slotNames[currentIndex];
-      setWinner(actualWinner);
+      const finalPositioning = () => {
+        const positioningElapsed = Date.now() - positioningStartTime;
+        const positioningProgress = Math.min(positioningElapsed / finalPositioningDuration, 1);
+        
+        // Smooth final positioning with ease-out
+        const easedProgress = easeOutQuart(positioningProgress);
+        const currentFinalOffset = startOffset + (endOffset - startOffset) * easedProgress;
+        
+        setSlotOffset(currentFinalOffset);
+        
+        if (positioningProgress < 1) {
+          requestAnimationFrame(finalPositioning);
+        } else {
+          // Set winner based on final position
+          const actualWinner = slotNames[currentIndex];
+          setWinner(actualWinner);
+          
+          setTimeout(() => {
+            setShowWinner(true);
+            audioManager?.playWinnerSound();
+            triggerConfetti();
+          }, 100); // Slightly shorter delay for better UX
+        }
+      };
       
-      setTimeout(() => {
-        setShowWinner(true);
-        audioManager?.playWinnerSound();
-        triggerConfetti();
-      }, 300);
+      requestAnimationFrame(finalPositioning);
     };
     
     // Start spinning sound

@@ -7,6 +7,7 @@ interface AudioManager {
   playWinnerSound: () => void;
   playClickSound: () => void;
   stopSpinSound: () => void;
+  isWinnerSoundPlaying: () => boolean;
   toggleMute: () => void;
   isMuted: boolean;
 }
@@ -150,11 +151,19 @@ export function useAudioManager(isMuted: boolean): AudioManager | null {
         }
       };
 
+      const isWinnerSoundPlaying = () => {
+        if (winnerAudio) {
+          return !winnerAudio.paused && !winnerAudio.ended;
+        }
+        return false;
+      };
+
       audioRef.current = {
         playSpinSound,
         playWinnerSound,
         playClickSound,
         stopSpinSound,
+        isWinnerSoundPlaying,
         toggleMute: () => {}, // This will be handled by parent component
         isMuted
       };
